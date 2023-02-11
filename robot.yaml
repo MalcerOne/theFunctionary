@@ -1,6 +1,6 @@
 tasks:
-  Read the Emails:
-    shell: python -m robot --report NONE --outputdir output --logtitle "Task log" tasks.robot
+  Run Python:
+    shell: python tasks.py
 
 condaConfigFile: conda.yaml
 artifactsDir: output
@@ -8,3 +8,5 @@ PATH:
   - .
 PYTHONPATH:
   - .
+ignoreFiles:
+  - .gitignore

@@ -1,10 +1,14 @@
 # Importing useful libraries
-import time
 from datetime import datetime
 from dateutil import relativedelta
 from RPA.Browser.Selenium import Selenium
 from RPA.HTTP import HTTP
 from RPA.Excel.Files import Files
+
+# Defining some variables about the file
+__author__ = "Rafael Malcervelli"
+__version__ = "1.0.0"
+__email__ = "r.malcervelli@gmail.com"
 
 # Class definition
 class Robot:
@@ -170,21 +174,6 @@ class Robot:
         else:
             print("You need to get all articles first")
 
-def main():
-    robot = Robot()
-    try:
-        robot.open_the_website()
-        robot.search_for("joe biden")
-        time.sleep(1)
-        robot.apply_filters("arts", 0)
-        time.sleep(2)
-        robot.get_all_articles()
-        robot.export_to_excel()
-
-    except Exception as e:
-        print(e)
-        print("Something went wrong")
-
 if __name__ == "__main__":
-    main()
+    print("[X] You are running this module file directly (and not importing it).")
     

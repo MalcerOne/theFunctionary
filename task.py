@@ -1,36 +1,32 @@
 # Importing useful libraries
-from RPA.Browser.Selenium import Selenium
-import utils
+import time, os
+from utils import Robot
+from dotenv import load_dotenv, find_dotenv
 
 # Defining some variables about the file
 __author__ = "Rafael Malcervelli"
 __version__ = "1.0.0"
 __email__ = "r.malcervelli@gmail.com"
 
-# Defining global variables
-browser_lib = Selenium(auto_close=True)
-
-# ================ Functions ================
-def open_the_website(url):
-    browser_lib.open_available_browser(url)
-
-def search_for(term):
-    input_field = "css:input"
-    browser_lib.input_text(input_field, term)
-    browser_lib.press_keys(input_field, "ENTER")
-
-def store_screenshot(filename):
-    browser_lib.screenshot(filename=filename)
-# ===========================================
-
 # ================ Main ================
 def main():
+    load_dotenv(find_dotenv())
+    robot = Robot()
     try:
-        open_the_website("www.nytimes.com")
-        search_for("python")
-        store_screenshot("output/screenshot.png")
+        robot.open_the_website()
+        robot.search_for(os.environ.get("PHRASE"))
+        time.sleep(1)
+        robot.apply_filters(os.environ.get("SECTION"), int(os.environ.get("NUMBER_OF_MONTHS")))
+        time.sleep(2)
+        robot.get_all_articles()
+        robot.export_to_excel()
+        print("[+] Done! :)")
+
+    except Exception as e:
+        print(e)
+        print("Something went wrong")
     finally:
-        browser_lib.close_all_browsers()
+        robot.browser_lib.close_all_browsers()
 # ======================================
 
 # Calling the main function

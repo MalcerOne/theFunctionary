@@ -3,17 +3,21 @@ import time
 from datetime import datetime
 from dateutil import relativedelta
 from RPA.Browser.Selenium import Selenium
+from RPA.HTTP import HTTP
+from RPA.Excel.Files import Files
 
 # Class definition
 class Robot:
     def __init__(self):
         self.url = "www.nytimes.com"
-        self.browser_lib = Selenium(auto_close=True)
+        self.browser_lib = Selenium(auto_close=True, )
+        self.http = HTTP()
 
     def open_the_website(self):
         self.browser_lib.open_available_browser(self.url, maximized=True)
 
     def search_for(self, phrase):
+        self.phrase = phrase
         self.browser_lib.click_element("//html/body/div[1]/div[2]/div/header/section[1]/div[1]/div[2]/button")
 
         input_form = "//html/body/div[1]/div[2]/div/header/section[1]/div[1]/div[2]/div/form/div/input"
@@ -38,45 +42,148 @@ class Robot:
     def apply_filters(self, section, n_of_months):
         if self.new_search:
             # Clicking on the filter button to select the section
-            self.browser_lib.click_element("//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[2]/div/div/button")
-            ul_element = self.browser_lib.find_element("//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[2]/div/div/div/ul")
+            self.browser_lib.click_element("//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[2]/div/div/button")
+            ul_element = self.browser_lib.find_element("//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div/ul")
 
             for i in range(0, len(ul_element.text.split("\n"))):
                 if section.lower() in ul_element.text.split("\n")[i].lower():
-                    self.browser_lib.click_element(f"//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[2]/div/div/div/ul/li[{i+1}]/label")
+                    self.browser_lib.click_element(f"//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div/ul/li[{i+1}]/label")
                     break
-            
-            # Sorting by Newest
-            self.browser_lib.select_from_list_by_label("//html/body/div/div[2]/main/div/div[1]/div[1]/form/div[2]/div/select", "Sort by Newest")
 
             # Selecting the date range
-            self.browser_lib.click_element("//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[1]/div/div/button")
-            self.browser_lib.click_element("//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[1]/div/div/div/ul/li[6]/button")
+            self.browser_lib.click_element("//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[1]/div/div/button")
+            self.browser_lib.click_element("//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[1]/div/div/div/ul/li[6]/button")
 
-            if n_of_months == 0 or n_of_months == 1:
-                start_date = "{}/{}/{}".format(datetime.now().month, "01", datetime.now().year)
-                final_date = "{}/{}/{}".format(datetime.now().month + 1, "01", datetime.now().year)
+            if n_of_months <= 1:
+                date_format = '%m/%d/%Y'
+
+                start_date = datetime.now().replace(day=1)
+                final_date = start_date + relativedelta.relativedelta(months=1)
+
+                start_date = start_date.strftime(date_format)
+                final_date = final_date.strftime(date_format)
             else:
                 final_date, start_date = self.get_date_range(n_of_months)
 
-            xpath_form = "//html/body/div/div[2]/main/div/div[1]/div[2]/div/div/div[1]/div/div/div/div[2]/div/label[2]/input"
-            self.browser_lib.input_text(xpath_form, start_date)
-            self.browser_lib.input_text(xpath_form, final_date)
-            self.browser_lib.press_keys(xpath_form, "ENTER")
+            xpath_form1 = "//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[1]/div/div/div/div[2]/div/label[1]/input"
+            xpath_form2 = "//html/body/div/div[2]/main/div[1]/div[1]/div[2]/div/div/div[1]/div/div/div/div[2]/div/label[2]/input"
             
-    def get_all_articles(self):
-        articles = self.browser_lib.find_elements("//html/body/div/div[2]/main/div/div[2]/div/ol")
-        print(articles[1].text.split("\n"))
-        # /html/body/div/div[2]/main/div/div[2]/div/ol/li[1]
+            try:
+                print(start_date, final_date)
+                self.browser_lib.input_text(xpath_form1, start_date)
+                self.browser_lib.input_text(xpath_form2, final_date)
+                self.browser_lib.press_keys(xpath_form2, "ENTER")
+            except Exception as e:
+                print(e)
+                print("Invalid date range")
 
-
+    def count_in_title_description(self, title, description):
+        count = 0
+        for word in title.split(" "):
+            if word.lower() in self.phrase.lower() and len(word) > 2:
+                count += 1
         
+        for word in description.split(" "):
+            if word.lower() in self.phrase.lower() and len(word) > 2:
+                count += 1
+        
+        return count
+
+    def check_money(self, title, description):
+        for word in title.split(" "):
+            if word.lower() in ["$", "dollars", "USD"]:
+                return True
+        
+        for word in description.split(" "):
+            if word.lower() in ["$", "dollars", "USD"]:
+                return True
+        
+        return False
+
+    def get_all_articles(self):
+        dic_art = {}
+
+        # Accepting cookies
+        self.browser_lib.click_button_when_visible("//html/body/div/div[2]/main/div[2]/div[2]/div/div[2]/button[1]")
+
+        # Clicking on the show more button until there is no more `pages`
+        while True:
+            try:
+                self.browser_lib.click_button_when_visible("//html/body/div/div[2]/main/div/div[2]/div[3]/div/button")
+
+            except Exception as e:
+                break
+
+        try:
+            for i in range(1, 1000):
+                item = self.browser_lib.find_elements(f"//html/body/div/div[2]/main/div[1]/div[2]/div[2]/ol/li[{i}]/div/div")
+                
+                if item == []:
+                    break
+                elif item == [""]:
+                    continue
+
+                list_items = item[0].text.split("\n")
+                
+                if len(list_items) > 1:
+                    item_date = self.browser_lib.find_element(f"//html/body/div/div[2]/main/div[1]/div[2]/div[2]/ol/li[{i}]/div/span").text
+                    filename = f"article_{i}.jpg"
+                    
+                    self.http.download(self.browser_lib.find_element(f"//html/body/div/div[2]/main/div[1]/div[2]/div[2]/ol/li[{i}]/div/div/figure/div/img").get_attribute("src"), f"output/{filename}")
+
+                    dic_art[i] = {"title": list_items[1], "date": item_date,"description": list_items[2], "picture_filename": filename, "count_search": self.count_in_title_description(list_items[1], list_items[2]), "money": self.check_money(list_items[1], list_items[2])}
+                else:
+                    continue
+            
+            self.dict_articles = dic_art
+            self.got_all_articles = True
+        except Exception as e:
+            print(e)
+            if e == "list index out of range":
+                print("No more articles to show")
+                pass
+        
+    def export_to_excel(self):
+        if self.got_all_articles:
+            files = Files()
+            filename = "articles.xlsx"
+            excel_file = files.create_workbook(filename)
+
+            excel_file.set_cell_value(1, 1, "Title")
+            excel_file.set_cell_value(1, 2, "Date")
+            excel_file.set_cell_value(1, 3, "Description")
+            excel_file.set_cell_value(1, 4, "Picture filename")
+            excel_file.set_cell_value(1, 5, "Count of search phrases")
+            excel_file.set_cell_value(1, 6, "Contains money")
+
+            row = 2
+            for article_id, article in self.dict_articles.items():
+                excel_file.set_cell_value(row, 1, article["title"])
+                excel_file.set_cell_value(row, 2, article["date"])
+                excel_file.set_cell_value(row, 3, article["description"])
+                excel_file.set_cell_value(row, 4, article["picture_filename"])
+                excel_file.set_cell_value(row, 5, article["count_search"])
+                excel_file.set_cell_value(row, 6, article["money"])
+                row += 1
+            
+            excel_file.save(filename)
+        else:
+            print("You need to get all articles first")
+
 def main():
     robot = Robot()
-    robot.open_the_website()
-    robot.search_for("python")
-    robot.apply_filters("arts", 2)
-    robot.get_all_articles()
+    try:
+        robot.open_the_website()
+        robot.search_for("joe biden")
+        time.sleep(1)
+        robot.apply_filters("arts", 0)
+        time.sleep(2)
+        robot.get_all_articles()
+        robot.export_to_excel()
+
+    except Exception as e:
+        print(e)
+        print("Something went wrong")
 
 if __name__ == "__main__":
     main()
